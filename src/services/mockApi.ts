@@ -12,19 +12,36 @@ const delay = (ms: number = 500) => new Promise(resolve => setTimeout(resolve, m
 
 class MockApiService {
   private token: string | null = null;
-
   public setToken(token: string) {
     this.token = token;
-    localStorage.setItem('admin_token', token);
+    try {
+      // For mock/dev environment set a non-HttpOnly cookie so client can proceed
+      if (typeof document !== 'undefined') {
+        document.cookie = `access_token=${token}; path=/;`;
+      }
+    } catch (e) {
+      // ignore
+    }
   }
 
   public clearToken() {
     this.token = null;
-    localStorage.removeItem('admin_token');
+    try {
+      if (typeof document !== 'undefined') {
+        document.cookie = 'access_token=; Max-Age=0; path=/;';
+      }
+    } catch (e) {}
   }
 
   public getToken(): string | null {
-    return this.token || localStorage.getItem('admin_token');
+    if (this.token) return this.token;
+    try {
+      if (typeof document === 'undefined') return null;
+      const match = document.cookie.match(new RegExp('(^| )access_token=([^;]+)'));
+      return match ? match[2] : null;
+    } catch (e) {
+      return null;
+    }
   }
 
   // Auth
@@ -34,6 +51,9 @@ class MockApiService {
     // Mock admin credentials
     if (phone === '+79999999999' && password === 'admin123') {
       const mockToken = 'mock_admin_token_' + Date.now();
+      // Set mock cookie for dev flows
+      this.setToken(mockToken);
+
       return {
         success: true,
         data: {

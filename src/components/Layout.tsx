@@ -41,8 +41,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     setMobileOpen(!mobileOpen);
   };
 
-  const handleLogout = () => {
-    api.clearToken();
+  const handleLogout = async () => {
+    try {
+      await api.post('/auth/logout', {});
+    } catch (error) {
+      // Continue logout even if API call fails
+    }
     navigate('/login');
   };
 

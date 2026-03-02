@@ -28,7 +28,7 @@ const LoginPage: React.FC = () => {
       const response: any = await mockApi.login(phoneNumber, password);
 
       if (response.data.token) {
-        mockApi.setToken(response.data.token);
+        // Server / mock sets cookie; just navigate to app
         navigate('/');
       }
     } catch (err: any) {
