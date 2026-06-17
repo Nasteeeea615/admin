@@ -47,6 +47,11 @@ interface User {
     rating: number;
     completed_orders_count: number;
     balance?: number;
+    documents?: {
+      passport_photo?: string;
+      driver_license_photo?: string;
+      vehicle_registration_photo?: string;
+    };
   };
 }
 
@@ -391,6 +396,44 @@ const UsersPage: React.FC = () => {
                       }
                       color={selectedUser.executor_profile.is_verified ? 'success' : 'warning'}
                     />
+                  </DetailRow>
+
+                  <DetailRow label="Документы">
+                    <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                      {[
+                        { key: 'passport_photo', label: 'Паспорт' },
+                        { key: 'driver_license_photo', label: 'Вод. удостоверение' },
+                        { key: 'vehicle_registration_photo', label: 'СТС' },
+                      ].map((d) => {
+                        const src = (selectedUser.executor_profile?.documents as any)?.[d.key];
+                        return (
+                          <Box key={d.key} sx={{ textAlign: 'center' }}>
+                            <Typography variant="caption" display="block" sx={{ mb: 0.5 }}>
+                              {d.label}
+                            </Typography>
+                            {src ? (
+                              <a href={src} target="_blank" rel="noreferrer">
+                                <img
+                                  src={src}
+                                  alt={d.label}
+                                  style={{
+                                    width: 120,
+                                    height: 90,
+                                    objectFit: 'cover',
+                                    borderRadius: 4,
+                                    border: '1px solid #ccc',
+                                  }}
+                                />
+                              </a>
+                            ) : (
+                              <Typography variant="caption" color="text.secondary">
+                                не загружено
+                              </Typography>
+                            )}
+                          </Box>
+                        );
+                      })}
+                    </Box>
                   </DetailRow>
 
                   <DetailRow label="Выполнено заказов">
