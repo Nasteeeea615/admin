@@ -11,7 +11,7 @@ import {
   Payment,
   CheckCircle,
 } from '@mui/icons-material';
-import mockApi from '../services/mockApi';
+import api from '../services/api';
 
 interface StatCardProps {
   title: string;
@@ -66,8 +66,8 @@ const DashboardPage: React.FC = () => {
 
   const loadAnalytics = async () => {
     try {
-      const response = await mockApi.getAnalytics();
-      setAnalytics(response.data);
+      const response = await api.get('/admin/analytics');
+      setAnalytics(response as any);
     } catch (error) {
       console.error('Failed to load analytics:', error);
     } finally {
@@ -83,13 +83,13 @@ const DashboardPage: React.FC = () => {
     );
   }
 
-  const completedOrders = analytics?.orders.byStatus.find((s: any) => s.status === 'completed')?.count || 0;
+  const completedOrders = analytics?.orders?.byStatus?.find((s: any) => s.status === 'completed')?.count || 0;
   const totalUsers = (analytics?.activeUsers.clients || 0) + (analytics?.activeUsers.executors || 0);
 
   return (
     <Box>
       <Typography variant="h4" gutterBottom>
-        Дашборд
+        Главная
       </Typography>
       <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 3, mb: 4 }}>
         <StatCard
@@ -125,14 +125,6 @@ const DashboardPage: React.FC = () => {
         <Typography variant="body1" color="text.secondary">
           Здесь вы можете управлять заказами, пользователями, платежами и обращениями в поддержку.
         </Typography>
-        <Box sx={{ mt: 2, p: 2, backgroundColor: '#f5f5f5', borderRadius: 1 }}>
-          <Typography variant="body2" color="primary" fontWeight="bold">
-            🔧 Режим тестирования с мок-данными
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            Для входа используйте: +79999999999 / admin123
-          </Typography>
-        </Box>
       </Paper>
     </Box>
   );

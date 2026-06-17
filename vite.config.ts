@@ -5,10 +5,32 @@ import svgr from 'vite-plugin-svgr';
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react(), svgr()],
-  root: 'public',
-  publicDir: '.',
+  publicDir: 'public',
   build: {
-    outDir: '../build',
+    outDir: 'build',
     sourcemap: true,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) {
+            return undefined;
+          }
+
+          if (id.includes('recharts')) {
+            return 'charts';
+          }
+
+          if (id.includes('@mui') || id.includes('@emotion')) {
+            return 'mui';
+          }
+
+          if (id.includes('axios')) {
+            return 'http';
+          }
+
+          return 'vendor';
+        },
+      },
+    },
   },
 });

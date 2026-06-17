@@ -73,8 +73,8 @@ const PaymentsPage: React.FC = () => {
       setLoading(true);
       setError('');
       const params: any = {
+        page: page + 1,
         limit: rowsPerPage,
-        offset: page * rowsPerPage,
       };
       if (statusFilter) {
         params.status = statusFilter;
@@ -88,7 +88,7 @@ const PaymentsPage: React.FC = () => {
 
       const response: any = await api.get('/admin/payments', params);
       setPayments(response.payments || []);
-      setTotalPayments(response.total || 0);
+      setTotalPayments(response.pagination?.total || 0);
       setTotalAmount(response.totalAmount || 0);
     } catch (err: any) {
       setError(err.response?.data?.error || 'Ошибка загрузки платежей');
@@ -168,6 +168,24 @@ const PaymentsPage: React.FC = () => {
       minute: '2-digit',
     });
   };
+
+  const DetailRow: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
+    <Box
+      sx={{
+        display: 'grid',
+        gridTemplateColumns: { xs: '1fr', sm: '180px 1fr' },
+        gap: 1,
+        py: 1.25,
+        borderBottom: '1px solid',
+        borderColor: 'divider',
+      }}
+    >
+      <Typography variant="subtitle2" color="text.secondary">
+        {label}
+      </Typography>
+      <Box>{children}</Box>
+    </Box>
+  );
 
   const columns: Column[] = [
     { id: 'id', label: 'ID', minWidth: 100, format: (value) => value.substring(0, 8) },
@@ -295,90 +313,61 @@ const PaymentsPage: React.FC = () => {
       />
 
       {/* Payment Details Dialog */}
-      <Dialog open={detailsOpen} onClose={() => setDetailsOpen(false)} maxWidth="md" fullWidth>
+      <Dialog open={detailsOpen} onClose={() => setDetailsOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>Детали платежа</DialogTitle>
         <DialogContent>
           {selectedPayment && (
-            <Box sx={{ pt: 2 }}>
-              <Typography variant="subtitle2" color="text.secondary">
-                ID платежа
-              </Typography>
-              <Typography variant="body1" sx={{ mb: 2 }}>
-                {selectedPayment.id}
-              </Typography>
+            <Box sx={{ pt: 1 }}>
+              <DetailRow label="ID платежа">
+                <Typography variant="body1">{selectedPayment.id}</Typography>
+              </DetailRow>
 
-              <Typography variant="subtitle2" color="text.secondary">
-                Статус
-              </Typography>
-              <Chip
-                label={getStatusText(selectedPayment.status)}
-                color={getStatusColor(selectedPayment.status)}
-                sx={{ mb: 2 }}
-              />
+              <DetailRow label="Статус">
+                <Chip label={getStatusText(selectedPayment.status)} color={getStatusColor(selectedPayment.status)} />
+              </DetailRow>
 
-              <Typography variant="subtitle2" color="text.secondary">
-                Сумма
-              </Typography>
-              <Typography variant="h5" sx={{ mb: 2 }}>
-                {selectedPayment.amount}₽
-              </Typography>
+              <DetailRow label="Сумма">
+                <Typography variant="h6">{selectedPayment.amount}₽</Typography>
+              </DetailRow>
 
-              <Typography variant="subtitle2" color="text.secondary">
-                Дата создания
-              </Typography>
-              <Typography variant="body1" sx={{ mb: 2 }}>
-                {formatDate(selectedPayment.created_at)}
-              </Typography>
+              <DetailRow label="Дата создания">
+                <Typography variant="body1">{formatDate(selectedPayment.created_at)}</Typography>
+              </DetailRow>
 
               {selectedPayment.completed_at && (
-                <>
-                  <Typography variant="subtitle2" color="text.secondary">
-                    Дата завершения
-                  </Typography>
-                  <Typography variant="body1" sx={{ mb: 2 }}>
-                    {formatDate(selectedPayment.completed_at)}
-                  </Typography>
-                </>
+                <DetailRow label="Дата завершения">
+                  <Typography variant="body1">{formatDate(selectedPayment.completed_at)}</Typography>
+                </DetailRow>
               )}
 
-              <Typography variant="subtitle2" color="text.secondary">
-                ID заказа
-              </Typography>
-              <Typography variant="body1" sx={{ mb: 2 }}>
-                {selectedPayment.order_id}
-              </Typography>
+              <DetailRow label="ID заказа">
+                <Typography variant="body1">{selectedPayment.order_id}</Typography>
+              </DetailRow>
 
-              <Typography variant="subtitle2" color="text.secondary">
-                Клиент
-              </Typography>
-              <Typography variant="body1" sx={{ mb: 2 }}>
-                {selectedPayment.client?.name || 'Неизвестно'}
-                {selectedPayment.client && ` (${selectedPayment.client.phone_number})`}
-              </Typography>
+              <DetailRow label="Клиент">
+                <Typography variant="body1">
+                  {selectedPayment.client?.name || 'Неизвестно'}
+                  {selectedPayment.client && ` (${selectedPayment.client.phone_number})`}
+                </Typography>
+              </DetailRow>
 
               {selectedPayment.transaction_id && (
-                <>
-                  <Typography variant="subtitle2" color="text.secondary">
-                    ID транзакции
-                  </Typography>
-                  <Typography variant="body1" sx={{ mb: 2 }}>
-                    {selectedPayment.transaction_id}
-                  </Typography>
-                </>
+                <DetailRow label="ID транзакции">
+                  <Typography variant="body1">{selectedPayment.transaction_id}</Typography>
+                </DetailRow>
               )}
 
-              <Typography variant="subtitle2" color="text.secondary">
-                Способ оплаты
-              </Typography>
-              <Typography variant="body1" sx={{ mb: 2 }}>
-                {selectedPayment.payment_method?.type === 'card' ? 'Банковская карта' : 'Сохраненная карта'}
-                {selectedPayment.payment_method?.cardLast4 &&
-                  ` (**** ${selectedPayment.payment_method.cardLast4})`}
-              </Typography>
+              <DetailRow label="Способ оплаты">
+                <Typography variant="body1">
+                  {selectedPayment.payment_method?.type === 'card' ? 'Банковская карта' : 'Сохраненная карта'}
+                  {selectedPayment.payment_method?.cardLast4 &&
+                    ` (**** ${selectedPayment.payment_method.cardLast4})`}
+                </Typography>
+              </DetailRow>
             </Box>
           )}
         </DialogContent>
-        <DialogActions>
+        <DialogActions sx={{ justifyContent: 'flex-start', flexWrap: 'wrap', gap: 1, px: 3, pb: 2 }}>
           {selectedPayment && selectedPayment.status === 'completed' && (
             <Button
               startIcon={<UndoIcon />}

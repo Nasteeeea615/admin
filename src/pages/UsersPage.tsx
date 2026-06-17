@@ -28,11 +28,25 @@ interface User {
   id: string;
   phone_number: string;
   name: string;
+  email?: string;
   role: string;
   is_blocked: boolean;
+  email_confirmed: boolean;
   created_at: string;
-  client_profile?: any;
-  executor_profile?: any;
+  client_profile?: {
+    city: string;
+    street: string;
+    house_number: string;
+  };
+  executor_profile?: {
+    vehicle_number: string;
+    vehicle_capacity: number;
+    is_verified: boolean;
+    is_working: boolean;
+    rating: number;
+    completed_orders_count: number;
+    balance?: number;
+  };
 }
 
 const UsersPage: React.FC = () => {
@@ -57,6 +71,8 @@ const UsersPage: React.FC = () => {
   });
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState('');
+  const [balanceDialogOpen, setBalanceDialogOpen] = useState(false);
+  const [balanceAmount, setBalanceAmount] = useState('1000');
 
   useEffect(() => {
     fetchUsers();
@@ -67,8 +83,8 @@ const UsersPage: React.FC = () => {
       setLoading(true);
       setError('');
       const params: any = {
+        page: page + 1,
         limit: rowsPerPage,
-        offset: page * rowsPerPage,
       };
       if (roleFilter) {
         params.role = roleFilter;
@@ -76,7 +92,7 @@ const UsersPage: React.FC = () => {
 
       const response: any = await api.get('/admin/users', params);
       setUsers(response.users || []);
-      setTotalUsers(response.total || 0);
+      setTotalUsers(response.pagination?.total || 0);
     } catch (err: any) {
       setError(err.response?.data?.error || 'Ошибка загрузки пользователей');
       console.error('Error fetching users:', err);
@@ -93,7 +109,7 @@ const UsersPage: React.FC = () => {
   const handleBlockUser = async (userId: string, block: boolean) => {
     setActionLoading(true);
     try {
-      await api.put(`/admin/users/${userId}/block`, { block });
+      await api.put(`/admin/users/${userId}/block`, { isBlocked: block });
       fetchUsers();
       setDetailsOpen(false);
       setConfirmDialog({ ...confirmDialog, open: false });
@@ -104,10 +120,25 @@ const UsersPage: React.FC = () => {
     }
   };
 
+  const handleTopUpBalance = async () => {
+    if (!selectedUser) return;
+    setActionLoading(true);
+    try {
+      await api.post(`/admin/users/${selectedUser.id}/balance`, { amount: Number(balanceAmount) });
+      fetchUsers();
+      setBalanceDialogOpen(false);
+      setBalanceAmount('1000');
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Ошибка пополнения баланса');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const handleVerifyExecutor = async (userId: string, verify: boolean) => {
     setActionLoading(true);
     try {
-      await api.put(`/admin/users/${userId}/verify`, { verify });
+      await api.put(`/admin/users/${userId}/verify`, { isVerified: verify });
       fetchUsers();
       setDetailsOpen(false);
       setConfirmDialog({ ...confirmDialog, open: false });
@@ -162,15 +193,40 @@ const UsersPage: React.FC = () => {
     });
   };
 
+  const DetailRow: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
+    <Box
+      sx={{
+        display: 'grid',
+        gridTemplateColumns: { xs: '1fr', sm: '180px 1fr' },
+        gap: 1,
+        py: 1.25,
+        borderBottom: '1px solid',
+        borderColor: 'divider',
+      }}
+    >
+      <Typography variant="subtitle2" color="text.secondary">
+        {label}
+      </Typography>
+      <Box>{children}</Box>
+    </Box>
+  );
+
   const columns: Column[] = [
-    { id: 'id', label: 'ID', minWidth: 100, format: (value) => value.substring(0, 8) },
+    { id: 'id', label: 'ID', minWidth: 100, format: (value) => String(value || '').substring(0, 8) },
     { id: 'name', label: 'Имя', minWidth: 150 },
     { id: 'phone_number', label: 'Телефон', minWidth: 130 },
+    { id: 'email', label: 'Email', minWidth: 160 },
     {
       id: 'role',
       label: 'Роль',
       minWidth: 120,
       format: (value) => getRoleText(value),
+    },
+    {
+      id: 'email_confirmed',
+      label: 'Email подтверждён',
+      minWidth: 130,
+      format: (value) => (value ? '✅ Да' : '❌ Нет'),
     },
     {
       id: 'is_blocked',
@@ -236,52 +292,51 @@ const UsersPage: React.FC = () => {
       />
 
       {/* User Details Dialog */}
-      <Dialog open={detailsOpen} onClose={() => setDetailsOpen(false)} maxWidth="md" fullWidth>
+      <Dialog open={detailsOpen} onClose={() => setDetailsOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>Профиль пользователя</DialogTitle>
         <DialogContent>
           {selectedUser && (
-            <Box sx={{ pt: 2 }}>
-              <Typography variant="subtitle2" color="text.secondary">
-                ID
-              </Typography>
-              <Typography variant="body1" sx={{ mb: 2 }}>
-                {selectedUser.id}
-              </Typography>
+            <Box sx={{ pt: 1 }}>
+              <DetailRow label="ID">
+                <Typography variant="body1">{selectedUser.id}</Typography>
+              </DetailRow>
 
-              <Typography variant="subtitle2" color="text.secondary">
-                Имя
-              </Typography>
-              <Typography variant="body1" sx={{ mb: 2 }}>
-                {selectedUser.name}
-              </Typography>
+              <DetailRow label="Имя">
+                <Typography variant="body1">{selectedUser.name}</Typography>
+              </DetailRow>
 
-              <Typography variant="subtitle2" color="text.secondary">
-                Номер телефона
-              </Typography>
-              <Typography variant="body1" sx={{ mb: 2 }}>
-                {selectedUser.phone_number}
-              </Typography>
+              <DetailRow label="Номер телефона">
+                <Typography variant="body1">{selectedUser.phone_number}</Typography>
+              </DetailRow>
 
-              <Typography variant="subtitle2" color="text.secondary">
-                Роль
-              </Typography>
-              <Chip label={getRoleText(selectedUser.role)} sx={{ mb: 2 }} />
+              {selectedUser.email && (
+                <DetailRow label="Email">
+                  <Typography variant="body1">{selectedUser.email}</Typography>
+                </DetailRow>
+              )}
 
-              <Typography variant="subtitle2" color="text.secondary">
-                Статус
-              </Typography>
-              <Chip
-                label={selectedUser.is_blocked ? 'Заблокирован' : 'Активен'}
-                color={selectedUser.is_blocked ? 'error' : 'success'}
-                sx={{ mb: 2 }}
-              />
+              <DetailRow label="Email подтверждён">
+                <Chip
+                  label={selectedUser.email_confirmed ? 'Подтверждён' : 'Не подтверждён'}
+                  color={selectedUser.email_confirmed ? 'success' : 'default'}
+                  size="small"
+                />
+              </DetailRow>
 
-              <Typography variant="subtitle2" color="text.secondary">
-                Дата регистрации
-              </Typography>
-              <Typography variant="body1" sx={{ mb: 2 }}>
-                {formatDate(selectedUser.created_at)}
-              </Typography>
+              <DetailRow label="Роль">
+                <Chip label={getRoleText(selectedUser.role)} />
+              </DetailRow>
+
+              <DetailRow label="Статус">
+                <Chip
+                  label={selectedUser.is_blocked ? 'Заблокирован' : 'Активен'}
+                  color={selectedUser.is_blocked ? 'error' : 'success'}
+                />
+              </DetailRow>
+
+              <DetailRow label="Дата регистрации">
+                <Typography variant="body1">{formatDate(selectedUser.created_at)}</Typography>
+              </DetailRow>
 
               {selectedUser.role === 'client' && selectedUser.client_profile && (
                 <>
@@ -290,13 +345,12 @@ const UsersPage: React.FC = () => {
                     Профиль клиента
                   </Typography>
 
-                  <Typography variant="subtitle2" color="text.secondary">
-                    Адрес
-                  </Typography>
-                  <Typography variant="body1" sx={{ mb: 2 }}>
-                    {selectedUser.client_profile.city}, {selectedUser.client_profile.street},{' '}
-                    {selectedUser.client_profile.house_number}
-                  </Typography>
+                  <DetailRow label="Адрес">
+                    <Typography variant="body1">
+                      {selectedUser.client_profile.city}, {selectedUser.client_profile.street},{' '}
+                      {selectedUser.client_profile.house_number}
+                    </Typography>
+                  </DetailRow>
                 </>
               )}
 
@@ -307,52 +361,44 @@ const UsersPage: React.FC = () => {
                     Профиль исполнителя
                   </Typography>
 
-                  <Typography variant="subtitle2" color="text.secondary">
-                    Номер машины
-                  </Typography>
-                  <Typography variant="body1" sx={{ mb: 2 }}>
-                    {selectedUser.executor_profile.vehicle_number}
-                  </Typography>
+                  <DetailRow label="Номер машины">
+                    <Typography variant="body1">{selectedUser.executor_profile.vehicle_number}</Typography>
+                  </DetailRow>
 
-                  <Typography variant="subtitle2" color="text.secondary">
-                    Объем машины
-                  </Typography>
-                  <Typography variant="body1" sx={{ mb: 2 }}>
-                    {selectedUser.executor_profile.vehicle_capacity} м³
-                  </Typography>
+                  <DetailRow label="Объем машины">
+                    <Typography variant="body1">{selectedUser.executor_profile.vehicle_capacity} м³</Typography>
+                  </DetailRow>
 
-                  <Typography variant="subtitle2" color="text.secondary">
-                    Статус верификации
-                  </Typography>
-                  <Chip
-                    label={
-                      selectedUser.executor_profile.is_verified
-                        ? 'Подтвержден'
-                        : 'Ожидает проверки'
-                    }
-                    color={selectedUser.executor_profile.is_verified ? 'success' : 'warning'}
-                    sx={{ mb: 2 }}
-                  />
+                  <DetailRow label="Статус верификации">
+                    <Chip
+                      label={
+                        selectedUser.executor_profile.is_verified
+                          ? 'Подтвержден'
+                          : 'Ожидает проверки'
+                      }
+                      color={selectedUser.executor_profile.is_verified ? 'success' : 'warning'}
+                    />
+                  </DetailRow>
 
-                  <Typography variant="subtitle2" color="text.secondary">
-                    Рейтинг
-                  </Typography>
-                  <Typography variant="body1" sx={{ mb: 2 }}>
-                    ⭐ {selectedUser.executor_profile.rating || 0}
-                  </Typography>
+                  <DetailRow label="Рейтинг">
+                    <Typography variant="body1">⭐ {selectedUser.executor_profile.rating || 0}</Typography>
+                  </DetailRow>
 
-                  <Typography variant="subtitle2" color="text.secondary">
-                    Выполнено заказов
-                  </Typography>
-                  <Typography variant="body1" sx={{ mb: 2 }}>
-                    {selectedUser.executor_profile.completed_orders_count || 0}
-                  </Typography>
+                  <DetailRow label="Выполнено заказов">
+                    <Typography variant="body1">{selectedUser.executor_profile.completed_orders_count || 0}</Typography>
+                  </DetailRow>
+
+                  <DetailRow label="Баланс">
+                    <Typography variant="body1" fontWeight="bold">
+                      {Number(selectedUser.executor_profile.balance || 0).toFixed(2)} ₽
+                    </Typography>
+                  </DetailRow>
                 </>
               )}
             </Box>
           )}
         </DialogContent>
-        <DialogActions>
+        <DialogActions sx={{ justifyContent: 'flex-start', flexWrap: 'wrap', gap: 1, px: 3, pb: 2 }}>
           {selectedUser && selectedUser.role === 'executor' && !selectedUser.executor_profile?.is_verified && (
             <>
               <Button
@@ -371,6 +417,14 @@ const UsersPage: React.FC = () => {
               </Button>
             </>
           )}
+          {selectedUser && selectedUser.role === 'executor' && (
+            <Button
+              color="info"
+              onClick={() => setBalanceDialogOpen(true)}
+            >
+              Пополнить баланс
+            </Button>
+          )}
           {selectedUser && (
             <Button
               startIcon={<BlockIcon />}
@@ -381,6 +435,34 @@ const UsersPage: React.FC = () => {
             </Button>
           )}
           <Button onClick={() => setDetailsOpen(false)}>Закрыть</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Balance top-up dialog */}
+      <Dialog open={balanceDialogOpen} onClose={() => setBalanceDialogOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>Пополнить баланс исполнителя</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            {selectedUser?.name} — текущий баланс: {Number(selectedUser?.executor_profile?.balance || 0).toFixed(2)} ₽
+          </Typography>
+          <TextField
+            label="Сумма пополнения (₽)"
+            type="number"
+            value={balanceAmount}
+            onChange={(e) => setBalanceAmount(e.target.value)}
+            fullWidth
+            inputProps={{ min: 1, step: 100 }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setBalanceDialogOpen(false)}>Отмена</Button>
+          <Button
+            variant="contained"
+            onClick={handleTopUpBalance}
+            disabled={actionLoading || !balanceAmount || Number(balanceAmount) <= 0}
+          >
+            Пополнить
+          </Button>
         </DialogActions>
       </Dialog>
 

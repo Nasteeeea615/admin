@@ -19,7 +19,7 @@ import {
 } from '@mui/material';
 import { Refresh as RefreshIcon } from '@mui/icons-material';
 import DataTable, { Column } from '../components/DataTable';
-import mockApi from '../services/mockApi';
+import api from '../services/api';
 
 interface Order {
   id: string;
@@ -33,7 +33,6 @@ interface Order {
   scheduled_date: string;
   scheduled_time: string;
   comment?: string;
-  is_urgent: boolean;
   price: number;
   created_at: string;
   client?: any;
@@ -64,16 +63,16 @@ const OrdersPage: React.FC = () => {
       setLoading(true);
       setError('');
       const params: any = {
+        page: page + 1,
         limit: rowsPerPage,
-        offset: page * rowsPerPage,
       };
       if (statusFilter) {
         params.status = statusFilter;
       }
 
-      const response: any = await mockApi.getOrders(params);
-      setOrders(response.data.orders || []);
-      setTotalOrders(response.data.pagination.total || 0);
+      const response: any = await api.get('/admin/orders', params);
+      setOrders(response.orders || []);
+      setTotalOrders(response.pagination?.total || 0);
     } catch (err: any) {
       setError(err.response?.data?.error || 'Ошибка загрузки заказов');
       console.error('Error fetching orders:', err);
@@ -84,11 +83,11 @@ const OrdersPage: React.FC = () => {
 
   const fetchExecutors = async (capacity: number) => {
     try {
-      const response: any = await mockApi.getUsers({
+      const response: any = await api.get('/admin/users', {
         role: 'executor',
         vehicle_capacity: capacity,
       });
-      setExecutors(response.data.users || []);
+      setExecutors(response.users || []);
     } catch (err) {
       console.error('Error fetching executors:', err);
     }
@@ -110,7 +109,7 @@ const OrdersPage: React.FC = () => {
 
     setAssignLoading(true);
     try {
-      await mockApi.assignExecutor(selectedOrder.id, selectedExecutor);
+      await api.post(`/admin/orders/${selectedOrder.id}/assign`, { executor_id: selectedExecutor });
       setAssignDialogOpen(false);
       setSelectedExecutor('');
       fetchOrders();
@@ -123,7 +122,7 @@ const OrdersPage: React.FC = () => {
 
   const handleChangeStatus = async (orderId: string, newStatus: string) => {
     try {
-      await mockApi.updateOrder(orderId, { status: newStatus });
+      await api.put(`/admin/orders/${orderId}`, { status: newStatus });
       fetchOrders();
       setDetailsOpen(false);
     } catch (err: any) {
@@ -174,6 +173,24 @@ const OrdersPage: React.FC = () => {
     });
   };
 
+  const DetailRow: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
+    <Box
+      sx={{
+        display: 'grid',
+        gridTemplateColumns: { xs: '1fr', sm: '180px 1fr' },
+        gap: 1,
+        py: 1.25,
+        borderBottom: '1px solid',
+        borderColor: 'divider',
+      }}
+    >
+      <Typography variant="subtitle2" color="text.secondary">
+        {label}
+      </Typography>
+      <Box>{children}</Box>
+    </Box>
+  );
+
   const columns: Column[] = [
     { id: 'id', label: 'ID', minWidth: 100, format: (value) => value.substring(0, 8) },
     {
@@ -210,12 +227,6 @@ const OrdersPage: React.FC = () => {
       label: 'Дата',
       minWidth: 120,
       format: (value) => formatDate(value),
-    },
-    {
-      id: 'is_urgent',
-      label: 'Срочный',
-      minWidth: 80,
-      format: (value) => (value ? 'Да' : 'Нет'),
     },
   ];
 
@@ -272,91 +283,61 @@ const OrdersPage: React.FC = () => {
       />
 
       {/* Order Details Dialog */}
-      <Dialog open={detailsOpen} onClose={() => setDetailsOpen(false)} maxWidth="md" fullWidth>
+      <Dialog open={detailsOpen} onClose={() => setDetailsOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>Детали заказа</DialogTitle>
         <DialogContent>
           {selectedOrder && (
-            <Box sx={{ pt: 2 }}>
-              <Typography variant="subtitle2" color="text.secondary">
-                ID заказа
-              </Typography>
-              <Typography variant="body1" sx={{ mb: 2 }}>
-                {selectedOrder.id}
-              </Typography>
+            <Box sx={{ pt: 1 }}>
+              <DetailRow label="ID заказа">
+                <Typography variant="body1">{selectedOrder.id}</Typography>
+              </DetailRow>
 
-              <Typography variant="subtitle2" color="text.secondary">
-                Статус
-              </Typography>
-              <Chip
-                label={getStatusText(selectedOrder.status)}
-                color={getStatusColor(selectedOrder.status)}
-                sx={{ mb: 2 }}
-              />
+              <DetailRow label="Статус">
+                <Chip label={getStatusText(selectedOrder.status)} color={getStatusColor(selectedOrder.status)} />
+              </DetailRow>
 
-              <Typography variant="subtitle2" color="text.secondary">
-                Клиент
-              </Typography>
-              <Typography variant="body1" sx={{ mb: 2 }}>
-                {(selectedOrder as any).client_name} ({(selectedOrder as any).client_phone})
-              </Typography>
+              <DetailRow label="Клиент">
+                <Typography variant="body1">
+                  {(selectedOrder as any).client_name} ({(selectedOrder as any).client_phone})
+                </Typography>
+              </DetailRow>
 
-              <Typography variant="subtitle2" color="text.secondary">
-                Исполнитель
-              </Typography>
-              <Typography variant="body1" sx={{ mb: 2 }}>
-                {(selectedOrder as any).executor_name || 'Не назначен'}
-                {(selectedOrder as any).executor_phone && ` (${(selectedOrder as any).executor_phone})`}
-              </Typography>
+              <DetailRow label="Исполнитель">
+                <Typography variant="body1">
+                  {(selectedOrder as any).executor_name || 'Не назначен'}
+                  {(selectedOrder as any).executor_phone && ` (${(selectedOrder as any).executor_phone})`}
+                </Typography>
+              </DetailRow>
 
-              <Typography variant="subtitle2" color="text.secondary">
-                Адрес
-              </Typography>
-              <Typography variant="body1" sx={{ mb: 2 }}>
-                {selectedOrder.city}, {selectedOrder.street}, {selectedOrder.house_number}
-              </Typography>
+              <DetailRow label="Адрес">
+                <Typography variant="body1">
+                  {selectedOrder.city}, {selectedOrder.street}, {selectedOrder.house_number}
+                </Typography>
+              </DetailRow>
 
-              <Typography variant="subtitle2" color="text.secondary">
-                Дата и время
-              </Typography>
-              <Typography variant="body1" sx={{ mb: 2 }}>
-                {formatDate(selectedOrder.scheduled_date)} в {selectedOrder.scheduled_time}
-              </Typography>
+              <DetailRow label="Дата и время">
+                <Typography variant="body1">
+                  {formatDate(selectedOrder.scheduled_date)} в {selectedOrder.scheduled_time}
+                </Typography>
+              </DetailRow>
 
-              <Typography variant="subtitle2" color="text.secondary">
-                Объем машины
-              </Typography>
-              <Typography variant="body1" sx={{ mb: 2 }}>
-                {selectedOrder.vehicle_capacity} м³
-              </Typography>
+              <DetailRow label="Объем машины">
+                <Typography variant="body1">{selectedOrder.vehicle_capacity} м³</Typography>
+              </DetailRow>
 
-              <Typography variant="subtitle2" color="text.secondary">
-                Стоимость
-              </Typography>
-              <Typography variant="body1" sx={{ mb: 2 }}>
-                {selectedOrder.price}₽
-              </Typography>
+              <DetailRow label="Стоимость">
+                <Typography variant="body1">{selectedOrder.price}₽</Typography>
+              </DetailRow>
 
               {selectedOrder.comment && (
-                <>
-                  <Typography variant="subtitle2" color="text.secondary">
-                    Комментарий
-                  </Typography>
-                  <Typography variant="body1" sx={{ mb: 2 }}>
-                    {selectedOrder.comment}
-                  </Typography>
-                </>
+                <DetailRow label="Комментарий">
+                  <Typography variant="body1">{selectedOrder.comment}</Typography>
+                </DetailRow>
               )}
-
-              <Typography variant="subtitle2" color="text.secondary">
-                Срочный заказ
-              </Typography>
-              <Typography variant="body1" sx={{ mb: 2 }}>
-                {selectedOrder.is_urgent ? 'Да' : 'Нет'}
-              </Typography>
             </Box>
           )}
         </DialogContent>
-        <DialogActions>
+        <DialogActions sx={{ justifyContent: 'flex-start', flexWrap: 'wrap', gap: 1, px: 3, pb: 2 }}>
           {selectedOrder && !selectedOrder.executor_id && (
             <Button onClick={() => handleAssignExecutor(selectedOrder)} color="primary">
               Назначить исполнителя

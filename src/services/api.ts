@@ -32,6 +32,18 @@ class ApiService {
   }
 
   private setupInterceptors() {
+    // Request interceptor: attach JWT as Bearer. Cross-domain HttpOnly cookies
+    // are unreliable (SameSite/third-party-cookie blocking), so the admin keeps
+    // the token from verify-code in localStorage and sends it explicitly.
+    this.client.interceptors.request.use((config) => {
+      const token = localStorage.getItem('admin_token');
+      if (token) {
+        config.headers = config.headers || {};
+        (config.headers as any).Authorization = `Bearer ${token}`;
+      }
+      return config;
+    });
+
     // Response interceptors
 
     this.client.interceptors.response.use(
@@ -52,7 +64,8 @@ class ApiService {
         const isAuthRequest = requestUrl.includes('/auth/request-code') || requestUrl.includes('/auth/verify-code');
 
         if (error.response?.status === 401 && !isAuthRequest && window.location.pathname !== '/login') {
-          // If unauthorized, redirect to login (server should clear cookie)
+          // If unauthorized, drop the stale token and redirect to login.
+          localStorage.removeItem('admin_token');
           window.location.href = '/login';
         }
         return Promise.reject(error);

@@ -68,8 +68,8 @@ const SupportPage: React.FC = () => {
       setLoading(true);
       setError('');
       const params: any = {
+        page: page + 1,
         limit: rowsPerPage,
-        offset: page * rowsPerPage,
       };
       if (statusFilter) {
         params.status = statusFilter;
@@ -77,7 +77,7 @@ const SupportPage: React.FC = () => {
 
       const response: any = await api.get('/admin/tickets', params);
       setTickets(response.tickets || []);
-      setTotalTickets(response.total || 0);
+      setTotalTickets(response.pagination?.total || 0);
     } catch (err: any) {
       setError(err.response?.data?.error || 'Ошибка загрузки тикетов');
       console.error('Error fetching tickets:', err);

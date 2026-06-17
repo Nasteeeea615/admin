@@ -30,9 +30,10 @@ const drawerWidth = 240;
 
 interface LayoutProps {
   children: React.ReactNode;
+  onLogout: () => void;
 }
 
-const Layout: React.FC<LayoutProps> = ({ children }) => {
+const Layout: React.FC<LayoutProps> = ({ children, onLogout }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -47,11 +48,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     } catch (error) {
       // Continue logout even if API call fails
     }
+    onLogout();
     navigate('/login');
   };
 
   const menuItems = [
-    { text: 'Дашборд', icon: <DashboardIcon />, path: '/' },
+    { text: 'Главная', icon: <DashboardIcon />, path: '/' },
     { text: 'Заказы', icon: <OrdersIcon />, path: '/orders' },
     { text: 'Пользователи', icon: <UsersIcon />, path: '/users' },
     { text: 'Платежи', icon: <PaymentsIcon />, path: '/payments' },

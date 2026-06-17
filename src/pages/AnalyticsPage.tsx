@@ -40,6 +40,37 @@ interface Analytics {
   paymentsChart?: any[];
 }
 
+const normalizeAnalytics = (payload: any): Analytics => {
+  if (!payload || typeof payload !== 'object') {
+    return {
+      totalOrders: 0,
+      totalPayments: 0,
+      activeUsers: 0,
+      newRegistrations: 0,
+      ordersChart: [],
+      paymentsChart: [],
+    };
+  }
+
+  const totalOrders = payload.totalOrders ?? payload.orders?.total ?? 0;
+  const totalPayments = payload.totalPayments ?? payload.payments?.total ?? 0;
+  const activeUsers = payload.activeUsers && typeof payload.activeUsers === 'object'
+    ? (payload.activeUsers.clients || 0) + (payload.activeUsers.executors || 0)
+    : payload.activeUsers || 0;
+  const newRegistrations = payload.newRegistrations && Array.isArray(payload.newRegistrations)
+    ? payload.newRegistrations.reduce((sum: number, item: any) => sum + (item?.count || 0), 0)
+    : payload.newRegistrations || 0;
+
+  return {
+    totalOrders,
+    totalPayments,
+    activeUsers,
+    newRegistrations,
+    ordersChart: Array.isArray(payload.ordersChart) ? payload.ordersChart : [],
+    paymentsChart: Array.isArray(payload.paymentsChart) ? payload.paymentsChart : [],
+  };
+};
+
 interface StatCardProps {
   title: string;
   value: string | number;
@@ -98,7 +129,7 @@ const AnalyticsPage: React.FC = () => {
       setLoading(true);
       setError('');
       const response: any = await api.get('/admin/analytics', { period });
-      setAnalytics(response);
+      setAnalytics(normalizeAnalytics(response));
     } catch (err: any) {
       setError(err.response?.data?.error || 'Ошибка загрузки аналитики');
       console.error('Error fetching analytics:', err);

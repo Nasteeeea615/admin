@@ -10,8 +10,19 @@ import {
 // Simulate network delay
 const delay = (ms: number = 500) => new Promise(resolve => setTimeout(resolve, ms));
 
+const MOCK_ADMIN_EMAIL = 'admin@septic1.local';
+const MOCK_ADMIN_CODE = '123456';
+
+const mockAdminUser = {
+  id: 'admin-1',
+  email: MOCK_ADMIN_EMAIL,
+  name: 'Администратор',
+  role: 'admin',
+};
+
 class MockApiService {
   private token: string | null = null;
+  private pendingEmailCodes: Record<string, string> = {};
   public setToken(token: string) {
     this.token = token;
     try {
@@ -45,6 +56,91 @@ class MockApiService {
   }
 
   // Auth
+  async requestCode(email: string, role: string = 'admin') {
+    await delay();
+
+    const normalizedEmail = (email || '').trim().toLowerCase();
+    if (!normalizedEmail) {
+      throw new Error('Email обязателен');
+    }
+
+    if (role !== 'admin') {
+      throw new Error('Недостаточно прав');
+    }
+
+    if (normalizedEmail !== MOCK_ADMIN_EMAIL) {
+      throw new Error('Администратор с таким email не найден');
+    }
+
+    this.pendingEmailCodes[normalizedEmail] = MOCK_ADMIN_CODE;
+
+    return {
+      success: true,
+      data: {
+        message: 'Код отправлен',
+        debugCode: MOCK_ADMIN_CODE,
+      },
+    };
+  }
+
+  async verifyCode(email: string, code: string, role: string = 'admin') {
+    await delay();
+
+    const normalizedEmail = (email || '').trim().toLowerCase();
+    const normalizedCode = String(code || '').trim();
+    const expectedCode = this.pendingEmailCodes[normalizedEmail];
+
+    if (role !== 'admin') {
+      throw new Error('Недостаточно прав');
+    }
+
+    if (!expectedCode || normalizedCode !== expectedCode) {
+      throw new Error('Неверный код подтверждения');
+    }
+
+    const mockToken = 'mock_admin_token_' + Date.now();
+    this.setToken(mockToken);
+    delete this.pendingEmailCodes[normalizedEmail];
+
+    return {
+      success: true,
+      data: {
+        token: mockToken,
+        user: mockAdminUser,
+      },
+    };
+  }
+
+  async me() {
+    await delay(200);
+
+    const token = this.getToken();
+    if (!token) {
+      const error: any = new Error('Не авторизован');
+      error.response = { status: 401, data: { error: 'Unauthorized' } };
+      throw error;
+    }
+
+    return {
+      success: true,
+      data: {
+        user: mockAdminUser,
+      },
+    };
+  }
+
+  async logout() {
+    await delay(200);
+    this.clearToken();
+
+    return {
+      success: true,
+      data: {
+        message: 'Вы вышли из системы',
+      },
+    };
+  }
+
   async login(phone: string, password: string) {
     await delay();
     
@@ -350,8 +446,10 @@ class MockApiService {
   // Generic methods for compatibility
   async get<T>(url: string, params?: any): Promise<T> {
     const urlParts = url.split('/');
-    
-    if (url.includes('/admin/orders')) {
+
+    if (url.includes('/auth/me')) {
+      return this.me() as T;
+    } else if (url.includes('/admin/orders')) {
       return this.getOrders(params) as T;
     } else if (url.includes('/admin/users')) {
       const userId = urlParts[urlParts.length - 1];
@@ -375,7 +473,13 @@ class MockApiService {
   }
 
   async post<T>(url: string, data?: any): Promise<T> {
-    if (url.includes('/auth/admin/login')) {
+    if (url.includes('/auth/request-code')) {
+      return this.requestCode(data?.email, data?.role) as T;
+    } else if (url.includes('/auth/verify-code')) {
+      return this.verifyCode(data?.email, data?.code, data?.role) as T;
+    } else if (url.includes('/auth/logout')) {
+      return this.logout() as T;
+    } else if (url.includes('/auth/admin/login')) {
       return this.login(data.phone_number, data.password) as T;
     } else if (url.includes('/assign')) {
       const orderId = url.split('/')[3];
@@ -409,7 +513,7 @@ class MockApiService {
     throw new Error('Unknown endpoint');
   }
 
-  async delete<T>(url: string): Promise<T> {
+  async delete<T>(url: string, _config?: any): Promise<T> {
     throw new Error('Delete not implemented in mock');
   }
 }

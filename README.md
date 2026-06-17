@@ -18,13 +18,7 @@ npm install
 
 ## Конфигурация
 
-Создайте файл `.env` на основе `.env.example`:
-
-```bash
-cp .env.example .env
-```
-
-Настройте URL API в `.env`:
+Создайте файл `.env` и укажите URL API:
 
 ```
 REACT_APP_API_URL=http://localhost:3000/api
@@ -32,31 +26,14 @@ REACT_APP_API_URL=http://localhost:3000/api
 
 ## Запуск
 
-### 🧪 Режим тестирования с мок-данными (рекомендуется)
-
-Админ-панель настроена для работы с тестовыми данными БЕЗ backend:
+Админ-панель теперь работает с backend по умолчанию. Вход выполняется по коду из email для пользователя с ролью `admin`.
 
 ```bash
+npm install
 npm start
 ```
 
-Приложение откроется по адресу [http://localhost:3000](http://localhost:3000)
-
-**Тестовые данные для входа:**
-- Телефон: `+79999999999`
-- Пароль: `admin123`
-
-📖 **Подробная инструкция:** см. [QUICK_START.md](QUICK_START.md) или [TESTING.md](TESTING.md)
-
-### Режим разработки с backend
-
-Для работы с реальным backend измените импорты в файлах страниц:
-```typescript
-// Замените
-import mockApi from '../services/mockApi';
-// На
-import api from '../services/api';
-```
+Для локальной проверки убедитесь, что backend запущен и в базе есть пользователь с email администратора, например `admin@septic1.local`.
 
 ### Сборка для продакшена
 
@@ -88,7 +65,6 @@ admin/
 │   │   └── api.ts               # API клиент
 │   ├── App.tsx          # Главный компонент
 │   └── index.tsx        # Точка входа
-├── .env.example         # Пример конфигурации
 └── package.json
 ```
 
@@ -112,17 +88,19 @@ admin/
 
 ## Авторизация
 
-Для входа в админ-панель используйте учетные данные администратора:
+Для входа в админ-панель используйте email администратора. Сначала запросите код, затем подтвердите его.
 
-- Номер телефона: (будет настроено на backend)
-- Пароль: (будет настроено на backend)
+Если SMTP не настроен в development, backend вернет debug-код в ответе и продублирует его в логах.
 
 ## API Endpoints
 
 Админ-панель использует следующие API endpoints:
 
 ### Авторизация
-- `POST /api/auth/admin/login` - Вход администратора
+- `POST /api/auth/request-code` - запрос кода входа
+- `POST /api/auth/verify-code` - подтверждение кода входа
+- `GET /api/auth/me` - текущая сессия
+- `POST /api/auth/logout` - выход
 
 ### Заказы
 - `GET /api/admin/orders` - Получить все заказы
@@ -150,46 +128,20 @@ admin/
 
 ## Разработка
 
-### Добавление новой страницы
-
-1. Создайте компонент страницы в `src/pages/`
-2. Добавьте маршрут в `src/App.tsx`
-3. Добавьте пункт меню в `src/components/Layout.tsx`
-
-### Стилизация
-
-Используйте Material-UI компоненты и систему стилей:
-
-```tsx
-import { Box, Typography } from '@mui/material';
-
-<Box sx={{ p: 2, backgroundColor: 'primary.main' }}>
-  <Typography variant="h4">Заголовок</Typography>
-</Box>
-```
-
 ### Работа с API
 
-Используйте сервис `api` для всех запросов:
+Используйте сервис `api` для всех запросов. Он уже нормализует ответ backend и работает с cookie-based сессией.
 
-```tsx
-import api from '../services/api';
+### Локальная проверка
 
-const fetchData = async () => {
-  try {
-    const data = await api.get('/admin/orders');
-    console.log(data);
-  } catch (error) {
-    console.error('Error:', error);
-  }
-};
-```
+1. Запустите backend.
+2. Убедитесь, что у пользователя-администратора заполнен `email`.
+3. Зайдите в админку, запросите код и подтвердите его.
 
 ## Безопасность
 
-- Все маршруты защищены проверкой токена
-- Токен хранится в localStorage
-- При ошибке 401 происходит автоматический редирект на страницу входа
+- Все маршруты защищены проверкой сессии через `access_token` cookie
+- 401 приводит к редиректу на страницу входа
 - Используйте HTTPS в продакшене
 
 ## Производительность

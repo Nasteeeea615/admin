@@ -54,11 +54,15 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
     setLoading(true);
 
     try {
-      await api.post('/auth/verify-code', {
+      const result: any = await api.post('/auth/verify-code', {
         email: sentEmail || email.trim().toLowerCase(),
         code,
         role: 'admin',
       });
+
+      if (result?.token) {
+        localStorage.setItem('admin_token', result.token);
+      }
 
       onLoginSuccess();
       navigate('/');
