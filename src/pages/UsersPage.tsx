@@ -33,6 +33,7 @@ interface User {
   is_blocked: boolean;
   email_confirmed: boolean;
   created_at: string;
+  verification_status?: string;
   client_profile?: {
     city: string;
     street: string;
@@ -91,7 +92,14 @@ const UsersPage: React.FC = () => {
       }
 
       const response: any = await api.get('/admin/users', params);
-      setUsers(response.users || []);
+      const list: User[] = (response.users || []).map((u: any) => ({
+        ...u,
+        verification_status:
+          u.role === 'executor'
+            ? (u.executor_profile?.is_verified ? '✅ Подтверждён' : '⏳ Ожидает проверки')
+            : '—',
+      }));
+      setUsers(list);
       setTotalUsers(response.pagination?.total || 0);
     } catch (err: any) {
       setError(err.response?.data?.error || 'Ошибка загрузки пользователей');
@@ -233,6 +241,11 @@ const UsersPage: React.FC = () => {
       label: 'Статус',
       minWidth: 100,
       format: (value) => (value ? 'Заблокирован' : 'Активен'),
+    },
+    {
+      id: 'verification_status',
+      label: 'Проверка',
+      minWidth: 160,
     },
     {
       id: 'created_at',
@@ -378,10 +391,6 @@ const UsersPage: React.FC = () => {
                       }
                       color={selectedUser.executor_profile.is_verified ? 'success' : 'warning'}
                     />
-                  </DetailRow>
-
-                  <DetailRow label="Рейтинг">
-                    <Typography variant="body1">⭐ {selectedUser.executor_profile.rating || 0}</Typography>
                   </DetailRow>
 
                   <DetailRow label="Выполнено заказов">
