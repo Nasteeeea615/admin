@@ -8,34 +8,72 @@ import {
   Box,
   Alert,
   CircularProgress,
+  Stack,
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
-import mockApi from '../services/mockApi';
+import api from '../services/api';
 
-const LoginPage: React.FC = () => {
+interface LoginPageProps {
+  onLoginSuccess: () => void;
+}
+
+const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
   const navigate = useNavigate();
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('');
+  const [code, setCode] = useState('');
+  const [step, setStep] = useState<'email' | 'code'>('email');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [sentEmail, setSentEmail] = useState('');
+  const [debugCode, setDebugCode] = useState('');
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleRequestCode = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
     try {
-      const response: any = await mockApi.login(phoneNumber, password);
+      const response: any = await api.post('/auth/request-code', {
+        email,
+        role: 'admin',
+      });
 
-      if (response.data.token) {
-        // Server / mock sets cookie; just navigate to app
-        navigate('/');
-      }
+      setSentEmail(email.trim().toLowerCase());
+      setStep('code');
+      setDebugCode(response.debugCode || '');
     } catch (err: any) {
-      setError(err.message || 'Ошибка входа. Проверьте данные.');
+      setError(err.message || 'Не удалось отправить код. Проверьте email.');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleVerifyCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    try {
+      await api.post('/auth/verify-code', {
+        email: sentEmail || email.trim().toLowerCase(),
+        code,
+        role: 'admin',
+      });
+
+      onLoginSuccess();
+      navigate('/');
+    } catch (err: any) {
+      setError(err.message || 'Ошибка подтверждения кода.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleReset = () => {
+    setStep('email');
+    setCode('');
+    setDebugCode('');
+    setError('');
   };
 
   return (
@@ -53,19 +91,11 @@ const LoginPage: React.FC = () => {
             Админ-панель
           </Typography>
           <Typography variant="body2" align="center" color="text.secondary" sx={{ mb: 3 }}>
-            Септик Сервис
+            Вход по коду из email
           </Typography>
 
           <Alert severity="info" sx={{ mb: 2 }}>
-            <Typography variant="body2" fontWeight="bold">
-              Тестовые данные для входа:
-            </Typography>
-            <Typography variant="body2">
-              Телефон: +79999999999
-            </Typography>
-            <Typography variant="body2">
-              Пароль: admin123
-            </Typography>
+            Введите email администратора и подтвердите код из письма.
           </Alert>
 
           {error && (
@@ -74,33 +104,40 @@ const LoginPage: React.FC = () => {
             </Alert>
           )}
 
-          <Box component="form" onSubmit={handleSubmit}>
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              id="phoneNumber"
-              label="Номер телефона"
-              name="phoneNumber"
-              autoComplete="tel"
-              autoFocus
-              value={phoneNumber}
-              onChange={(e) => setPhoneNumber(e.target.value)}
-              disabled={loading}
-            />
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              name="password"
-              label="Пароль"
-              type="password"
-              id="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              disabled={loading}
-            />
+          <Box component="form" onSubmit={step === 'email' ? handleRequestCode : handleVerifyCode}>
+            {step === 'email' ? (
+              <TextField
+                margin="normal"
+                required
+                fullWidth
+                id="email"
+                label="Email"
+                name="email"
+                autoComplete="email"
+                autoFocus
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                disabled={loading}
+              />
+            ) : (
+              <Stack spacing={2} sx={{ mt: 1 }}>
+                <Alert severity="success">
+                  Код отправлен на {sentEmail || email}.
+                </Alert>
+                {debugCode && <Alert severity="warning">Код подтверждения: {debugCode}</Alert>}
+                <TextField
+                  required
+                  fullWidth
+                  name="code"
+                  label="Код подтверждения"
+                  id="code"
+                  autoComplete="one-time-code"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  disabled={loading}
+                />
+              </Stack>
+            )}
             <Button
               type="submit"
               fullWidth
@@ -108,8 +145,14 @@ const LoginPage: React.FC = () => {
               sx={{ mt: 3, mb: 2 }}
               disabled={loading}
             >
-              {loading ? <CircularProgress size={24} /> : 'Войти'}
+              {loading ? <CircularProgress size={24} /> : step === 'email' ? 'Отправить код' : 'Подтвердить код'}
             </Button>
+
+            {step === 'code' && (
+              <Button fullWidth variant="text" onClick={handleReset} disabled={loading}>
+                Изменить email
+              </Button>
+            )}
           </Box>
         </Paper>
       </Box>
